@@ -1,0 +1,17 @@
+{
+    "providers":
+    {
+        "Creators.TF":
+        {
+            "name": "Creators.TF",
+            "url": "https://creators.tf/api/IServers/GServerList?provider=15",
+            "providerID": 1
+        },
+        "Creators.TF/Balance Mod":
+        {
+            "name": "Creators.TF/Balance Mod",
+            "url": "https://creators.tf/api/IServers/GServerList?provider=1756",
+            "providerID": 2
+        }
+    }
+}
