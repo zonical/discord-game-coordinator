@@ -194,7 +194,10 @@ class GameCoordinatorBot(discord.Client):
             #Request the server information using the Creators.TF API.
             RequestObject_Obj = requests.get(providerObj.ProviderURL)
             ServerReqJSON_Obj = RequestObject_Obj.json()
-            if ServerReqJSON_Obj["result"] != "SUCCESS" or RequestObject_Obj.status_code != 200:
+            if RequestObject_Obj.status_code != 200:
+                print(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}.")
+                return
+            if ServerReqJSON_Obj["result"] != "SUCCESS":
                 print(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}.")
                 return
             
@@ -328,6 +331,8 @@ class GameCoordinatorBot(discord.Client):
 
     commands = {
         "c!findserver": command_findserver,
+        "c!find": command_findserver,
+        "c!play": command_findserver,
         "c!help": None,
     }
 
