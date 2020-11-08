@@ -13,13 +13,8 @@ from sys import argv
 #3) Having this matchmaking service be customisable (e.g search by region, map, etc.)
 class GameCoordinatorBot(discord.Client):
     providerdict = {}
-    lobbylist = []
+    lobbylist = {}
     waitinglist = []
-
-    #Our providers names with an ID assigned to them.
-    providers = {
-        1: "Creators.TF",
-        2: "Creators.TF/Balance Mod" }
 
     def __init__(self):
         #Initalise the bot.
@@ -64,6 +59,13 @@ class GameCoordinatorBot(discord.Client):
 
     #c!findserver. This will construct an embed where users can select what they want.
     async def command_findserver(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
+        if sender.id in self.lobbylist:
+            #Construct an embed.
+            embedMessage = discord.Embed(title="Discord Game Coordinator.")
+            embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
+            await channel.send(f"<@{sender.id}>", embed=embedMessage)
+            return
+        
         #Create our lobby class:
         theLobby = lobby.Lobby()
         theLobby.LobbyOwner = sender
@@ -164,7 +166,7 @@ class GameCoordinatorBot(discord.Client):
         maps = messageContent.strip()
         messageContent = messageContent.replace(',', '')
         theLobby.LobbyMaps = messageContent.split().copy()
-        providerName = self.providers[theLobby.LobbyProvider]
+        providerName = self.providerdict[theLobby.LobbyProvider].ProviderName
 
         #Make our fourth embed, to start searching.
         embedMessage = discord.Embed(title="Discord Game Coordinator.")
@@ -175,8 +177,19 @@ class GameCoordinatorBot(discord.Client):
 
         await actualMessage.edit(embed=embedMessage) #Edit the original message.
         print(f"[LOBBY] Final constructed lobby:\n", theLobby.LobbyOwner, theLobby.LobbyProvider, theLobby.LobbyRegion, theLobby.LobbyChannelSentIn)
-        self.lobbylist.append(theLobby)
+        self.lobbylist[sender.id] = theLobby
         return
+    #c!stop. Stops searching for servers.
+    async def command_stop(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
+        if sender.id in self.lobbylist:
+            self.lobbylist.pop(sender.id) #Remove.
+            #Construct an embed.
+            embedMessage = discord.Embed(title="Discord Game Coordinator.")
+            embedMessage.add_field(name="Unexpected landing! :cry:", value="You have been removed from the matchmaking queue. You can requeue with the command c!play.",inline=False)
+            await channel.send(f"<@{sender.id}>", embed=embedMessage)
+        else:
+            await channel.send(f"<@{sender.id}>, you are currently not in the matchmaking queue.")
+
 
     class ServerQueryFail(BaseException):
         pass
@@ -191,15 +204,31 @@ class GameCoordinatorBot(discord.Client):
             NewServerList = []
             providerObj = self.providerdict[provider]
             
-            #Request the server information using the Creators.TF API.
-            RequestObject_Obj = requests.get(providerObj.ProviderURL)
-            ServerReqJSON_Obj = RequestObject_Obj.json()
-            if RequestObject_Obj.status_code != 200:
-                print(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}.")
-                return
-            if ServerReqJSON_Obj["result"] != "SUCCESS":
-                print(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}.")
-                return
+            try:
+                #Request the server information using the Creators.TF API.
+                RequestObject_Obj = requests.get(providerObj.ProviderURL)
+
+                if not RequestObject_Obj.json():
+                    raise self.ServerQueryFail(f"Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}\nUnable to construct a proper JSON object.")
+                    continue
+                ServerReqJSON_Obj = RequestObject_Obj.json()
+
+                #GET request returned something that wasn't OK.
+                if RequestObject_Obj.status_code != 200:
+                    raise self.ServerQueryFail(f"Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}")
+                    continue
+
+                #API returned an error.
+                if ServerReqJSON_Obj["result"] != "SUCCESS":
+                    ErrorInformation = ServerReqJSON_Obj["error"]
+                    ErrorCode = ErrorInformation["code"]
+                    ErrorTitle = ErrorInformation["title"]
+                    ErrorContent = ErrorInformation["content"]
+                    raise self.ServerQueryFail(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}. Status code {ErrorCode}.\n{ErrorTitle}\n{ErrorContent}")
+                    continue
+            except self.ServerQueryFail as ServerQFail:
+                print(f"[EXCEPTION] ServerQueryFail reported: \n{ServerQFail}")
+                continue
             
             ServerJSON_Obj = ServerReqJSON_Obj["servers"]
 
@@ -222,7 +251,6 @@ class GameCoordinatorBot(discord.Client):
 
             providerObj.ProviderServers = NewServerList
             print(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
-
 
     @tasks.loop(seconds=5)
     async def loop_lobbymatchmaking(self):
@@ -264,7 +292,8 @@ class GameCoordinatorBot(discord.Client):
             return True
 
         #Loop through all the lobbies currently in our queue.
-        for lobbyObj in self.lobbylist:
+        for key in self.lobbylist.copy():
+            lobbyObj = self.lobbylist.copy()[key]
             await asyncio.sleep(0.5)
             print(f"[LOBBY] Processing Lobby owned by: {lobbyObj.LobbyOwner}")
             self.bestServer = None #Store the best server that we have so far.
@@ -326,13 +355,15 @@ class GameCoordinatorBot(discord.Client):
 
             await lobbyObj.LobbyChannelSentIn.send(f"<@{lobbyObj.LobbyOwner.id}>", embed=embedMessage) #Edit the original message.
 
-            self.lobbylist.remove(lobbyObj)
+            self.lobbylist.pop(lobbyObj.LobbyOwner.id)
             await asyncio.sleep(0.5)
 
     commands = {
         "c!findserver": command_findserver,
         "c!find": command_findserver,
         "c!play": command_findserver,
+        "c!stop": command_stop,
+        "c!stopsearch": command_stop,
         "c!help": None,
     }
 
