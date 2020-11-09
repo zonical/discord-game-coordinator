@@ -4,6 +4,7 @@ import lobby
 import a2s
 import server_coordinator
 import requests
+import json
 from discord.ext import commands, tasks
 from sys import argv 
 
@@ -228,6 +229,9 @@ class GameCoordinatorBot(discord.Client):
                     continue
             except self.ServerQueryFail as ServerQFail:
                 print(f"[EXCEPTION] ServerQueryFail reported: \n{ServerQFail}")
+                continue
+            except json.JSONDecodeError:
+                print(f"[EXCEPTION] Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}\nUnable to construct a proper JSON object.")
                 continue
             
             ServerJSON_Obj = ServerReqJSON_Obj["servers"]
