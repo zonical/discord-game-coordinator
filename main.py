@@ -5,8 +5,9 @@ import a2s
 import server_coordinator
 import requests
 import json
+import re
 from discord.ext import commands, tasks
-from sys import argv 
+from sys import argv
 
 #The Game Coordinator bot class. This bot has three main purposes:
 #1) Getting the latest server information of Creators.TF servers.
@@ -34,7 +35,8 @@ class GameCoordinatorBot(discord.Client):
         print("[START] Game Coordinator Bot has started.")
         print(f"[START] Information: Version 0.1a, Created by ZoNiCaL. Bot Account: {self.user}")
         
-
+    #The on_message event. Whenever a message is sent on a server with the bot,
+    #it picks it up and processes it in this function.
     async def on_message(self, message : discord.Message):
         #Don't worry about anything from DM's.
         if message.guild is None:
@@ -56,6 +58,7 @@ class GameCoordinatorBot(discord.Client):
             print(f"[COMMAND] Invalid command from {message.author}: {actualCommand}")
             return
         
+        #We have a dictionary object full of command names, and the functions that we're calling.
         await self.commands[actualCommand](self, sender, message.channel, commandArgs)
 
     #c!findserver. This will construct an embed where users can select what they want.
@@ -164,9 +167,8 @@ class GameCoordinatorBot(discord.Client):
 
         #Remove whitespace from the maps/gamemodes, and set our lobby map/gamemode list.
         messageContent = maps.content
-        maps = messageContent.strip()
-        messageContent = messageContent.replace(',', '')
-        theLobby.LobbyMaps = messageContent.split().copy()
+        messageContent = re.sub(r'\s+', '', messageContent)
+        theLobby.LobbyMaps = messageContent.split(',').copy()
         providerName = self.providerdict[theLobby.LobbyProvider].ProviderName
 
         #Make our fourth embed, to start searching.
@@ -198,7 +200,7 @@ class GameCoordinatorBot(discord.Client):
     #The loop that handles server querying. Pings all of the servers in a list, which updates the list itself.
     @tasks.loop(seconds=10)
     async def loop_serverquerying(self):
-        Regions = {"us": 0, "eu": 1, "ru": 2}
+        Regions = {"us": 0, "eu": 1, "ru": 2} #temporarily hardcoded.
         #Go through each provider, and then each server:
         for provider in self.providerdict:
             ServerCount = 0
@@ -227,6 +229,8 @@ class GameCoordinatorBot(discord.Client):
                     ErrorContent = ErrorInformation["content"]
                     raise self.ServerQueryFail(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}. Status code {ErrorCode}.\n{ErrorTitle}\n{ErrorContent}")
                     continue
+                
+            #General error processing incase something goes wrong.
             except self.ServerQueryFail as ServerQFail:
                 print(f"[EXCEPTION] ServerQueryFail reported: \n{ServerQFail}")
                 continue
@@ -344,9 +348,23 @@ class GameCoordinatorBot(discord.Client):
 
             reaction = dictOfEmoji[lobbyObj.LobbyRegion]
 
-            #Make our embed that we send off to players..
+            #Make our embed that we send off to players.
             embedMessage = discord.Embed(title="Discord Game Coordinator")
-            #embedMessage.set_thumbnail(url=f"https://creators.tf/api/mapthumb?map={self.bestServer.ServerMap}")
+            # MapImageReq = requests.get("https://creators.tf/api/mapthumb?map=" + self.bestServer.ServerMap)
+
+            # #Lets be over the top and lets make something cool with the API features we have.
+            # if MapImageReq.status_code == 200:
+            #     img = Image.open(BytesIO(MapImageReq.content))
+            #     imagedraw = ImageDraw.Draw(img)
+
+            #     fnt = ImageFont.truetype('tf2build.ttf', 30)
+            #     fnt2 = ImageFont.truetype('tf2build.ttf', 20)
+            #     imagedraw.text((20,20), "You're on your way to...", font=fnt, fill=(255, 255, 255))
+            #     imagedraw.text((20,50), self.bestServer.ServerMap, font=fnt2, fill=(255, 255, 255))
+            #     img.save("tmp.png")
+            #     imgFile = discord.File("tmp.png")
+            #     embedMessage.set_image(imgFile)
+
             embedMessage.set_image(url=f"https://creators.tf/api/mapthumb?map={self.bestServer.ServerMap}")
             embedMessage.add_field(name="Touchdown :rocket: :sunglasses:", value="A server has been found for you!",inline=False)
             embedMessage.add_field(name="Provider", value=f"{providerName}", inline=True)
