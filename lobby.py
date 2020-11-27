@@ -3,7 +3,7 @@ class Lobby:
     LobbyChannelSentIn = None
     LobbyProvider = -1
     LobbyRegion = -1
-    LobbyMaps = []
+    LobbyMaps = None
 
 class QueueLobby:
     LobbyOwner = None

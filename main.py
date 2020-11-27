@@ -150,7 +150,7 @@ class GameCoordinatorBot(discord.Client):
         embedMessage.add_field(name="How to select a gamemode:", value="Please type which gamemodes you would to play using their map prefix. Example: koth, pl.", inline=True)
         embedMessage.add_field(name="How to select a specifc map:", value="Please type part of their map name. Example: pl_cactuscanyon, koth_clear.", inline=True)
         embedMessage.add_field(name="Selecting multiple items:", value="Please split each item in your selection with a comma (,). Spaces are not required. Example: koth, pl_cactuscaynon, plr_hightower.", inline=True)
-
+        embedMessage.add_field(name="Selecting all maps:", value="Please either type *, any, or all as your map selection. Do not add any other maps.", inline=True)
         await actualMessage.edit(embed=embedMessage) #Edit the original message.
         
         #Wait for this message of maps/gamemodes back.
@@ -165,10 +165,20 @@ class GameCoordinatorBot(discord.Client):
             await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
             return
 
-        #Remove whitespace from the maps/gamemodes, and set our lobby map/gamemode list.
+        #The message we've received.
         messageContent = maps.content
-        messageContent = re.sub(r'\s+', '', messageContent)
-        theLobby.LobbyMaps = messageContent.split(',').copy()
+
+        #If we want to select ANY map or gamemode, lets do it here.
+        for tmpStr in ["*", "any", "all"]:
+            if tmpStr in messageContent:
+                theLobby.LobbyMaps = tmpStr
+                break
+        else:
+            #Remove whitespace from the maps/gamemodes, and set our lobby map/gamemode list.
+            messageContent = re.sub(r'\s+', '', messageContent)
+            theLobby.LobbyMaps = messageContent.split(',').copy()
+        
+        #Get the name of our provider.
         providerName = self.providerdict[theLobby.LobbyProvider].ProviderName
 
         #Make our fourth embed, to start searching.
@@ -192,7 +202,6 @@ class GameCoordinatorBot(discord.Client):
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
         else:
             await channel.send(f"<@{sender.id}>, you are currently not in the matchmaking queue.")
-
 
     class ServerQueryFail(BaseException):
         pass
@@ -278,22 +287,26 @@ class GameCoordinatorBot(discord.Client):
                 if self.bestServer.ServerPlayers > server.ServerPlayers:
                     print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatiable. The best server has more players. ({self.bestServer.ServerPlayers} > {server.ServerPlayers})")
                     return False
-            
-            FoundMap = False
 
-            #Is one of our maps on this server currently?
-            for item in lobbyObj.LobbyMaps:
-                print(f"[LOBBY] Map Comparison: {item} -> {server.ServerMap}")
-                if item not in server.ServerMap:
-                    continue
-                else: #Found it!
-                    FoundMap = True
-                    print(f"[LOBBY] {lobbyObj.LobbyOwner}: Map found!")
-                    break
+            #We have specified maps/gamemodes we want to play, find them:
+            if type(lobbyObj.LobbyMaps) == list:          
+                FoundMap = False
 
-            if FoundMap == False:
-                print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatiable. No map found.")
-                return False
+                #Is one of our maps on this server currently?
+                for item in lobbyObj.LobbyMaps:
+                    print(f"[LOBBY] Map Comparison: {item} -> {server.ServerMap}")
+                    if item not in server.ServerMap:
+                        continue
+                    else: #Found it!
+                        FoundMap = True
+                        print(f"[LOBBY] {lobbyObj.LobbyOwner}: Map found!")
+                        break
+
+                if FoundMap == False:
+                    print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatiable. No map found.")
+                    return False
+            else:
+                print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby wants any map.")
 
             #We've passed all of our checks. Lets make this the best server.
             self.bestServer = server
