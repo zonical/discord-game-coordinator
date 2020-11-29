@@ -5,13 +5,31 @@
         {
             "name": "Creators.TF",
             "url": "https://creators.tf/api/IServers/GServerList?provider=15",
-            "providerID": 1
+            "providerID": 1,
+
+            "regions": [
+                0, 1, 2
+            ]
         },
         "Creators.TF/Balance Mod":
         {
             "name": "Creators.TF/Balance Mod",
             "url": "https://creators.tf/api/IServers/GServerList?provider=1756",
-            "providerID": 2
+            "providerID": 2,
+
+            "regions": [
+                0, 1, 6
+            ]
+        },
+        "Creators.TF Events Servers":
+        {
+            "name": "Creators.TF Event Servers",
+            "url": "https://creators.tf/api/IServers/GServerList?provider=11919",
+            "providerID": 3,
+
+            "regions": [
+                0, 1
+            ]
         }
     }
 }

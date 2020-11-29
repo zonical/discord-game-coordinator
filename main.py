@@ -9,6 +9,30 @@ import re
 from discord.ext import commands, tasks
 from sys import argv
 
+IDtoEmojis = {
+    1: ("1️⃣", ":one:"),
+    2: ("2️⃣", ":two:"),
+    3: ("3️⃣", ":three:"),
+    4: ("4️⃣", ":four:"),
+    5: ("5️⃣", ":five:"),
+    6: ("6️⃣", ":six:"),
+    7: ("7️⃣", ":seven:"),
+    8: ("8️⃣", ":eight:"),
+    9: ("9️⃣", ":nine"),
+}
+
+RegionIDToInformation = {
+    #ID: (raw emoji code, discord emoji code, display name)
+    0: ("🇺🇸", ":flag_us:", "USA/North America"),
+    1: ("🇪🇺", ":flag_eu:", "Europe"),
+    2: ("🇷🇺", ":flag_ru:", "Russia"),
+    3: ("🇦🇺", ":flag_au:", "Australia/Oceania"),
+    4: ("🇸🇬", ":flag_sg:", "Singapore"),
+    5: ("🇧🇷", ":flag_br:", "Brazil"),
+    6: ("🇳🇴", ":flag_no:", "Norway"),
+}
+
+
 #The Game Coordinator bot class. This bot has three main purposes:
 #1) Getting the latest server information of Creators.TF servers.
 #2) Providing a matchmaking service for the C.TF Discord.
@@ -69,7 +93,7 @@ class GameCoordinatorBot(discord.Client):
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
             return
-        
+
         #Create our lobby class:
         theLobby = lobby.Lobby()
         theLobby.LobbyOwner = sender
@@ -78,23 +102,22 @@ class GameCoordinatorBot(discord.Client):
         #Make the embed, with all of our providers.
         embedMessage = discord.Embed(title="Discord Game Coordinator.")
         embedMessage.add_field(name="Provider Selection.", value="Please pick a provider to search from using the reactions below.",inline=False)
-        embedMessage.add_field(name="Creators.TF", value=":one:", inline=True)
-        embedMessage.add_field(name="Creators.TF/Balance Mod", value=":two:", inline=True)
-        #embedMessage.add_field(name="ProviderName", value=":number:", inline=True) (Incase we ever decide to cater for more providers like potato.tf, give them an option here.)
-        
-        #This dict holds our emojis, as well as the values for our providers.
-        dictOfEmoji = {
-            "1️⃣": 1, 
-            "2️⃣": 2, }
+
+        #Loop through all of our registered providers and add them to the Embed:
+        for provider in self.providerdict.values():
+            EmojiTuple = IDtoEmojis[provider.ProviderID_GC]
+            embedMessage.add_field(name=provider.ProviderName, value=EmojiTuple[1], inline=True)
 
         actualMessage = await channel.send(embed=embedMessage) #Send here, returns a message object where we can add reactions.
         
-        for emoji in dictOfEmoji: #Add our emoji reactions so the user doesn't have to.
-            await actualMessage.add_reaction(emoji)
+        #Add our emoji reactions so the user doesn't have to.
+        for provider in self.providerdict:
+            emojiTuple = IDtoEmojis[provider]
+            await actualMessage.add_reaction(emojiTuple[0])
 
         #Wait for a reaction back:
         def check(reaction, user):
-            return user == sender and str(reaction.emoji) in dictOfEmoji
+            return user == sender
 
         try: #Start our waiting process.
             reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
@@ -103,31 +126,37 @@ class GameCoordinatorBot(discord.Client):
             return
 
         #Set our provider by grabbing a value from the dict.
-        if str(reaction.emoji) in dictOfEmoji:
-            theLobby.LobbyProvider = dictOfEmoji[str(reaction.emoji)]
-        else:
+        for providerID, emoji in IDtoEmojis.items():
+            if (str(reaction.emoji) == emoji[0]):
+                theLobby.LobbyProvider = providerID
+                break
+        
+        #Could not grab the emoji :(
+        if (theLobby.LobbyProvider == -1):
             await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has failed. Please submit a proper reaction next time.")
             return
 
         await actualMessage.clear_reactions() #Clear the reactions.
 
+        #======================================================================================================================================
+
+        #Create our ProviderObject so we can use it for later things:
+        ProviderObject = self.providerdict[theLobby.LobbyProvider]
+
         #Make our second embed, with all of our regions.
         embedMessage = discord.Embed(title="Discord Game Coordinator.")
         embedMessage.add_field(name="Region Selection.", value="Please pick a region to search in using the reactions below.",inline=False)
-        embedMessage.add_field(name="USA, North America", value=":flag_us:", inline=True)
-        embedMessage.add_field(name="EU, Europe", value=":flag_eu:", inline=True)
-        embedMessage.add_field(name="RU, Russia", value=":flag_ru:", inline=True)
-        #embedMessage.add_field(name="AU, Australia", value=":flag_au:", inline=True)
-        #embedMessage.add_field(name="SG, Singapore", value=":flag_sg:", inline=True)
-
-        #This dict holds our emojis, as well as the values for our regions.
-        #dictOfEmoji = {"🇺🇸": 1, "🇪🇺": 2, "🇷🇺": 3, "🇦🇺": 4, "🇸🇬": 5}
-        dictOfEmoji = {"🇺🇸": 0, "🇪🇺": 1, "🇷🇺": 2}
-        await actualMessage.edit(embed=embedMessage) #Edit the original message.
-    
-        for emoji in dictOfEmoji: #Add our emoji reactions so the user doesn't have to.
-            await actualMessage.add_reaction(emoji)
         
+        for region in ProviderObject.ProviderRegionIDs:
+            regionTuple = RegionIDToInformation[region]
+            embedMessage.add_field(name=regionTuple[2], value=regionTuple[0],inline=True)
+
+        await actualMessage.edit(embed=embedMessage) #Edit the original message.
+        
+        for region in ProviderObject.ProviderRegionIDs:
+            emojiTuple = RegionIDToInformation[region]
+            await actualMessage.add_reaction(emojiTuple[0])
+
         #Wait for our reaction back:
         try: #Start our waiting process.
             reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
@@ -136,9 +165,13 @@ class GameCoordinatorBot(discord.Client):
             return
 
         #Set our provider by grabbing a value from the dict.
-        if str(reaction.emoji) in dictOfEmoji:
-            theLobby.LobbyRegion = dictOfEmoji[str(reaction.emoji)]
-        else:
+        for regionID, emojituple in RegionIDToInformation.items():
+            if (str(reaction.emoji) == emojituple[0]):
+                theLobby.LobbyRegion = regionID
+                break
+        
+        #Could not grab the emoji :(
+        if (theLobby.LobbyRegion == -1):
             await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has failed. Please submit a proper reaction next time.")
             return
 
@@ -209,65 +242,76 @@ class GameCoordinatorBot(discord.Client):
     #The loop that handles server querying. Pings all of the servers in a list, which updates the list itself.
     @tasks.loop(seconds=10)
     async def loop_serverquerying(self):
-        Regions = {"us": 0, "eu": 1, "ru": 2} #temporarily hardcoded.
         #Go through each provider, and then each server:
         for provider in self.providerdict:
             ServerCount = 0
             NewServerList = []
             providerObj = self.providerdict[provider]
             
-            try:
-                #Request the server information using the Creators.TF API.
-                RequestObject_Obj = requests.get(providerObj.ProviderURL)
+            #Are we using the Creators.TF API?
+            if providerObj.ProviderAPIType == 1:
+                #Region ID's that match up with our pre-defined ones.
+                #Specific to the Creators API.
+                Regions = {
+                    "us": 0,
+                    "eu": 1,
+                    "ru": 2,
+                    "au": 3,
+                    "sg": 4,
+                    "br": 5,
+                    "no": 6, }
+                try:
+                    #Request the server information using the Creators.TF API.
+                    RequestObject_Obj = requests.get(providerObj.ProviderURL)
 
-                if not RequestObject_Obj.json():
-                    raise self.ServerQueryFail(f"Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}\nUnable to construct a proper JSON object.")
+                    if not RequestObject_Obj.json():
+                        raise self.ServerQueryFail(f"Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}\nUnable to construct a proper JSON object.")
+                        continue
+                    ServerReqJSON_Obj = RequestObject_Obj.json()
+
+                    #GET request returned something that wasn't OK.
+                    if RequestObject_Obj.status_code != 200:
+                        raise self.ServerQueryFail(f"Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}")
+                        continue
+
+                    #API returned an error.
+                    if ServerReqJSON_Obj["result"] != "SUCCESS":
+                        ErrorInformation = ServerReqJSON_Obj["error"]
+                        ErrorCode = ErrorInformation["code"]
+                        ErrorTitle = ErrorInformation["title"]
+                        ErrorContent = ErrorInformation["content"]
+                        raise self.ServerQueryFail(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}. Status code {ErrorCode}.\n{ErrorTitle}\n{ErrorContent}")
+                        continue
+                    
+                #General error processing incase something goes wrong.
+                except self.ServerQueryFail as ServerQFail:
+                    print(f"[EXCEPTION] ServerQueryFail reported: \n{ServerQFail}")
                     continue
-                ServerReqJSON_Obj = RequestObject_Obj.json()
-
-                #GET request returned something that wasn't OK.
-                if RequestObject_Obj.status_code != 200:
-                    raise self.ServerQueryFail(f"Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}")
-                    continue
-
-                #API returned an error.
-                if ServerReqJSON_Obj["result"] != "SUCCESS":
-                    ErrorInformation = ServerReqJSON_Obj["error"]
-                    ErrorCode = ErrorInformation["code"]
-                    ErrorTitle = ErrorInformation["title"]
-                    ErrorContent = ErrorInformation["content"]
-                    raise self.ServerQueryFail(f"[SERVER] Failed to get list of servers for {providerObj.ProviderName}. Status code {ErrorCode}.\n{ErrorTitle}\n{ErrorContent}")
+                except json.JSONDecodeError:
+                    print(f"[EXCEPTION] Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}\nUnable to construct a proper JSON object.")
                     continue
                 
-            #General error processing incase something goes wrong.
-            except self.ServerQueryFail as ServerQFail:
-                print(f"[EXCEPTION] ServerQueryFail reported: \n{ServerQFail}")
-                continue
-            except json.JSONDecodeError:
-                print(f"[EXCEPTION] Failed to get list of servers for {providerObj.ProviderName}. Status code {RequestObject_Obj.status_code}\nUnable to construct a proper JSON object.")
-                continue
-            
-            ServerJSON_Obj = ServerReqJSON_Obj["servers"]
+                ServerJSON_Obj = ServerReqJSON_Obj["servers"]
 
-            #Now construct server objects:
-            for server in ServerJSON_Obj:
-                #Don't bother with these servers if we can't get to them.
-                if server["is_down"] or server["passworded"] == True:
-                    continue
-                
-                #Construct the server object.
-                Obj = server_coordinator.GameCoordinator_Server()
-                Obj.ServerAddress = (server["ip"], server["port"])
-                Obj.ServerName = server["hostname"]
-                Obj.ServerRegionID = Regions.get(server["region"])
-                Obj.ServerMap = server["map"]
-                Obj.ServerPlayers = server["online"]
-                Obj.ServerMaxPlayers = server["maxplayers"]
-                NewServerList.append(Obj)
-                ServerCount += 1
+                #Now construct server objects:
+                for server in ServerJSON_Obj:
+                    #Don't bother with these servers if we can't get to them.
+                    if server["is_down"] or server["passworded"] == True:
+                        continue
+                    
+                    #Construct the server object.
+                    Obj = server_coordinator.GameCoordinator_Server()
+                    Obj.ServerAddress = (server["ip"], server["port"])
+                    Obj.ServerName = server["hostname"]
+                    Obj.ServerRegionID = Regions.get(server["region"])
+                    Obj.ServerMap = server["map"]
+                    Obj.ServerPlayers = server["online"]
+                    Obj.ServerMaxPlayers = server["maxplayers"]
+                    NewServerList.append(Obj)
+                    ServerCount += 1
 
-            providerObj.ProviderServers = NewServerList
-            print(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
+                providerObj.ProviderServers = NewServerList
+                print(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
 
     @tasks.loop(seconds=5)
     async def loop_lobbymatchmaking(self):
