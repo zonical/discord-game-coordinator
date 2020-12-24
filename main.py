@@ -33,6 +33,40 @@ RegionIDToInformation = {
 }
 
 
+NameToProviderID = {
+    #Name: provider id
+    "creators.tf": 1,
+    "c.tf": 1,
+    "creators": 1,
+    "ctf": 1,
+    "bmod": 2,
+    "balancemod": 2,
+    "balancemod/creators": 2,
+    "events": 3,
+    "event": 3
+}
+
+NameToRegionID = {
+    #name: region id
+    "usa": 0,
+    "us": 0,
+    "na": 0,
+    "america": 0,
+    "europe": 1,
+    "eu": 1,
+    "russia": 2,
+    "ru": 2,
+    "oceania": 3,
+    "australia": 3,
+    "aus": 3,
+    "singapore": 4,
+    "brazil": 5,
+    "bra": 5,
+    "norway": 6,
+    "nor": 6
+}
+
+
 #The Game Coordinator bot class. This bot has three main purposes:
 #1) Getting the latest server information of Creators.TF servers.
 #2) Providing a matchmaking service for the C.TF Discord.
@@ -99,107 +133,117 @@ class GameCoordinatorBot(discord.Client):
         theLobby.LobbyOwner = sender
         theLobby.LobbyChannelSentIn = channel
         
-        #Make the embed, with all of our providers.
-        embedMessage = discord.Embed(title="Discord Game Coordinator.")
-        embedMessage.add_field(name="Provider Selection.", value="Please pick a provider to search from using the reactions below.",inline=False)
+        if len(arguments) > 0 and str(arguments[0]).lower() in NameToProviderID: # are there any arguments? is the provider valid?
+            theLobby.LobbyProvider = NameToProviderID[str(arguments[0]).lower()] # easy provider id getting
+        else: # no arguments or invalid provider
+            #Make the embed, with all of our providers.
+            embedMessage = discord.Embed(title="Discord Game Coordinator.")
+            embedMessage.add_field(name="Provider Selection.", value="Please pick a provider to search from using the reactions below.",inline=False)
 
-        #Loop through all of our registered providers and add them to the Embed:
-        for provider in self.providerdict.values():
-            EmojiTuple = IDtoEmojis[provider.ProviderID_GC]
-            embedMessage.add_field(name=provider.ProviderName, value=EmojiTuple[1], inline=True)
+            #Loop through all of our registered providers and add them to the Embed:
+            for provider in self.providerdict.values():
+                EmojiTuple = IDtoEmojis[provider.ProviderID_GC]
+                embedMessage.add_field(name=provider.ProviderName, value=EmojiTuple[1], inline=True)
 
-        actualMessage = await channel.send(embed=embedMessage) #Send here, returns a message object where we can add reactions.
+            actualMessage = await channel.send(embed=embedMessage) #Send here, returns a message object where we can add reactions.
+            
+            #Add our emoji reactions so the user doesn't have to.
+            for provider in self.providerdict:
+                emojiTuple = IDtoEmojis[provider]
+                await actualMessage.add_reaction(emojiTuple[0])
+
+            #Wait for a reaction back:
+            def check(reaction, user):
+                return user == sender
+
+            try: #Start our waiting process.
+                reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
+            except asyncio.TimeoutError: #We waited for too long :(
+                await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
+                return
+
+            #Set our provider by grabbing a value from the dict.
+            for providerID, emoji in IDtoEmojis.items():
+                if (str(reaction.emoji) == emoji[0]):
+                    theLobby.LobbyProvider = providerID
+                    break
         
-        #Add our emoji reactions so the user doesn't have to.
-        for provider in self.providerdict:
-            emojiTuple = IDtoEmojis[provider]
-            await actualMessage.add_reaction(emojiTuple[0])
+            #Could not grab the emoji :(
+            if (theLobby.LobbyProvider == -1):
+                await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has failed. Please submit a proper reaction next time.")
+                return
 
-        #Wait for a reaction back:
-        def check(reaction, user):
-            return user == sender
-
-        try: #Start our waiting process.
-            reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
-        except asyncio.TimeoutError: #We waited for too long :(
-            await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
-            return
-
-        #Set our provider by grabbing a value from the dict.
-        for providerID, emoji in IDtoEmojis.items():
-            if (str(reaction.emoji) == emoji[0]):
-                theLobby.LobbyProvider = providerID
-                break
-        
-        #Could not grab the emoji :(
-        if (theLobby.LobbyProvider == -1):
-            await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has failed. Please submit a proper reaction next time.")
-            return
-
-        await actualMessage.clear_reactions() #Clear the reactions.
+            await actualMessage.clear_reactions() #Clear the reactions.
 
         #======================================================================================================================================
 
         #Create our ProviderObject so we can use it for later things:
         ProviderObject = self.providerdict[theLobby.LobbyProvider]
 
-        #Make our second embed, with all of our regions.
-        embedMessage = discord.Embed(title="Discord Game Coordinator.")
-        embedMessage.add_field(name="Region Selection.", value="Please pick a region to search in using the reactions below.",inline=False)
-        
-        for region in ProviderObject.ProviderRegionIDs:
-            regionTuple = RegionIDToInformation[region]
-            embedMessage.add_field(name=regionTuple[2], value=regionTuple[0],inline=True)
+        if len(arguments) > 1 and str(arguments[1]).lower() in NameToRegionID: # same as provider but with region
+            theLobby.LobbyRegion = NameToRegionID[str(arguments[1]).lower()]
+        else: #again, fall back to the reactions if theres no region
+            #Make our second embed, with all of our regions.
+            embedMessage = discord.Embed(title="Discord Game Coordinator.")
+            embedMessage.add_field(name="Region Selection.", value="Please pick a region to search in using the reactions below.",inline=False)
+            
+            for region in ProviderObject.ProviderRegionIDs:
+                regionTuple = RegionIDToInformation[region]
+                embedMessage.add_field(name=regionTuple[2], value=regionTuple[0],inline=True)
 
-        await actualMessage.edit(embed=embedMessage) #Edit the original message.
-        
-        for region in ProviderObject.ProviderRegionIDs:
-            emojiTuple = RegionIDToInformation[region]
-            await actualMessage.add_reaction(emojiTuple[0])
+            await actualMessage.edit(embed=embedMessage) #Edit the original message.
+            
+            for region in ProviderObject.ProviderRegionIDs:
+                emojiTuple = RegionIDToInformation[region]
+                await actualMessage.add_reaction(emojiTuple[0])
 
-        #Wait for our reaction back:
-        try: #Start our waiting process.
-            reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
-        except asyncio.TimeoutError: #We waited for too long :(
-            await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
-            return
+            #Wait for our reaction back:
+            try: #Start our waiting process.
+                reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
+            except asyncio.TimeoutError: #We waited for too long :(
+                await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
+                return
 
-        #Set our provider by grabbing a value from the dict.
-        for regionID, emojituple in RegionIDToInformation.items():
-            if (str(reaction.emoji) == emojituple[0]):
-                theLobby.LobbyRegion = regionID
-                break
-        
-        #Could not grab the emoji :(
-        if (theLobby.LobbyRegion == -1):
-            await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has failed. Please submit a proper reaction next time.")
-            return
+            #Set our provider by grabbing a value from the dict.
+            for regionID, emojituple in RegionIDToInformation.items():
+                if (str(reaction.emoji) == emojituple[0]):
+                    theLobby.LobbyRegion = regionID
+                    break
+            
+            #Could not grab the emoji :(
+            if (theLobby.LobbyRegion == -1):
+                await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has failed. Please submit a proper reaction next time.")
+                return
 
-        await actualMessage.clear_reactions() #Clear the reactions.
+            await actualMessage.clear_reactions() #Clear the reactions.
 
-        #Make our third embed, for the gamemode selection.
-        embedMessage = discord.Embed(title="Discord Game Coordinator.")
-        embedMessage.add_field(name="Gamemode/Map Selection.", value="Please select the gamemodes/maps you would like to play on.",inline=False)
-        embedMessage.add_field(name="How to select a gamemode:", value="Please type which gamemodes you would to play using their map prefix. Example: koth, pl.", inline=True)
-        embedMessage.add_field(name="How to select a specifc map:", value="Please type part of their map name. Example: pl_cactuscanyon, koth_clear.", inline=True)
-        embedMessage.add_field(name="Selecting multiple items:", value="Please split each item in your selection with a comma (,). Spaces are not required. Example: koth, pl_cactuscaynon, plr_hightower.", inline=True)
-        embedMessage.add_field(name="Selecting all maps:", value="Please either type *, any, or all as your map selection. Do not add any other maps.", inline=True)
-        await actualMessage.edit(embed=embedMessage) #Edit the original message.
-        
-        #Wait for this message of maps/gamemodes back.
-        def mapCheck(message : discord.Message):
-            if message.author.id == sender.id:
-                return message.content
-        
-        #Wait for our message back:
-        try: #Start our waiting process.
-            maps = await self.wait_for('message', timeout=30.0, check=mapCheck)
-        except asyncio.TimeoutError: #We waited for too long :(
-            await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
-            return
+        messageContent = "" # we need to use this later
+        if len(arguments) > 2: # are there any arguments left?
+            messageContent = ','.join(arguments[2:len(arguments)]) #turn arguments into usable string
+        else: #again, fall back to the reactions if theres no region
+            #Make our third embed, for the gamemode selection.
+            embedMessage = discord.Embed(title="Discord Game Coordinator.")
+            embedMessage.add_field(name="Gamemode/Map Selection.", value="Please select the gamemodes/maps you would like to play on.",inline=False)
+            embedMessage.add_field(name="How to select a gamemode:", value="Please type which gamemodes you would to play using their map prefix. Example: koth, pl.", inline=True)
+            embedMessage.add_field(name="How to select a specifc map:", value="Please type part of their map name. Example: pl_cactuscanyon, koth_clear.", inline=True)
+            embedMessage.add_field(name="Selecting multiple items:", value="Please split each item in your selection with a comma (,). Spaces are not required. Example: koth, pl_cactuscaynon, plr_hightower.", inline=True)
+            embedMessage.add_field(name="Selecting all maps:", value="Please either type *, any, or all as your map selection. Do not add any other maps.", inline=True)
+            await actualMessage.edit(embed=embedMessage) #Edit the original message.
+            
+            #Wait for this message of maps/gamemodes back.
+            def mapCheck(message : discord.Message):
+                if message.author.id == sender.id:
+                    return message.content
+            
+            #Wait for our message back:
+            try: #Start our waiting process.
+                maps = await self.wait_for('message', timeout=30.0, check=mapCheck)
+            except asyncio.TimeoutError: #We waited for too long :(
+                await channel.send(f"<@{sender.id}>, your request to use the Game Coordinator has expired.")
+                return
 
-        #The message we've received.
-        messageContent = maps.content
+            #The message we've received.
+            messageContent = maps.content
 
         #If we want to select ANY map or gamemode, lets do it here.
         for tmpStr in ["*", "any", "all"]:
