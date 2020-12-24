@@ -151,7 +151,7 @@ class GameCoordinatorBot(discord.Client):
                 EmojiTuple = IDtoEmojis[provider.ProviderID_GC]
                 embedMessage.add_field(name=provider.ProviderName, value=EmojiTuple[1], inline=True)
 
-            actualMessage = await channel.send(embed=embedMessage) #Send here, returns a message object where we can add reactions.
+            await actualMessage.edit(embed=embedMessage) #Send here, returns a message object where we can add reactions.
             
             #Add our emoji reactions so the user doesn't have to.
             for provider in self.providerdict:
