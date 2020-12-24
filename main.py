@@ -91,7 +91,7 @@ class GameCoordinatorBot(discord.Client):
 
     async def on_ready(self):
         print("[START] Game Coordinator Bot has started.")
-        print(f"[START] Information: Version 0.1a, Created by ZoNiCaL. Bot Account: {self.user}")
+        print(f"[START] Information: Version 0.1b, Created by ZoNiCaL, Modified by qualitycont. Bot Account: {self.user}")
         
     #The on_message event. Whenever a message is sent on a server with the bot,
     #it picks it up and processes it in this function.
@@ -133,6 +133,12 @@ class GameCoordinatorBot(discord.Client):
         theLobby.LobbyOwner = sender
         theLobby.LobbyChannelSentIn = channel
         
+        #rthings we might need later
+        def check(reaction, user):
+            return user == sender
+
+        actualMessage = await channel.send(embed=discord.Embed(title="Discord Game Coordinator."))
+
         if len(arguments) > 0 and str(arguments[0]).lower() in NameToProviderID: # are there any arguments? is the provider valid?
             theLobby.LobbyProvider = NameToProviderID[str(arguments[0]).lower()] # easy provider id getting
         else: # no arguments or invalid provider
@@ -152,9 +158,6 @@ class GameCoordinatorBot(discord.Client):
                 emojiTuple = IDtoEmojis[provider]
                 await actualMessage.add_reaction(emojiTuple[0])
 
-            #Wait for a reaction back:
-            def check(reaction, user):
-                return user == sender
 
             try: #Start our waiting process.
                 reaction, user = await self.wait_for('reaction_add', timeout=30.0, check=check)
@@ -258,11 +261,14 @@ class GameCoordinatorBot(discord.Client):
         #Get the name of our provider.
         providerName = self.providerdict[theLobby.LobbyProvider].ProviderName
 
+        #Get the region emoji
+        regionEmoji = RegionIDToInformation[theLobby.LobbyRegion][1]
+
         #Make our fourth embed, to start searching.
         embedMessage = discord.Embed(title="Discord Game Coordinator.")
         embedMessage.add_field(name="Blast off! :sunglasses:", value="You have now been added into the matchmaking queue.",inline=False)
         embedMessage.add_field(name="Provider", value=f"{providerName}", inline=True)
-        embedMessage.add_field(name="Region:", value=f"{reaction}", inline=True)
+        embedMessage.add_field(name="Region:", value=f"{regionEmoji}", inline=True)
         embedMessage.add_field(name="Maps/Gamemodes:", value=f"{theLobby.LobbyMaps}", inline=True)
 
         await actualMessage.edit(embed=embedMessage) #Edit the original message.
