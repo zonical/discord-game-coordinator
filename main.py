@@ -73,7 +73,8 @@ cmdHelp = {
     "c!help [command]": "Shows all the commands and information about them.",
     "c!play [provider] [region] [maps]": "Enters you into a matchmaking lobby.",
     "c!stop": "Removes you from your matchmaking lobby.",
-    "c!setting (name) (value)": "Changes various user settings."
+    "c!setting (name) (value)": "Changes various user settings.",
+    "c!settings": "Shows your current settings."
 }
 
 # more in depth info when using c!help [command]
@@ -81,9 +82,14 @@ cmdAdvHelp = {
     "help": "Shows all the commands and information about them\nParameters: [] = optional, () = required",
     "play": "Enters you into a matchmaking lobby.\n[provider] = Server Prodiver (creators, bmod, events)\n[region] = Server Region (eu, na, ru, australia, singapore, brazil, norway)\n[maps] = Maps and gamemodes you want to play (koth, pl_coldwater, *)",
     "stop": "Removes you from your matchmaking lobby",
-    "setting": "Changes various user settings\n(name) = Name of the setting you want to change (min_players, max_players)\n(value) = Value to set that setting to"
+    "setting": "Changes various user settings\n(name) = Name of the setting you want to change (min_players, max_players)\n(value) = Value to set that setting to",
+    "settings": "Shows your current settings."
 }
 
+# Enables console printing of a lot of stuff
+debug = False
+if len(argv) > 2:
+    debug = bool(argv[2])
 
 #The Game Coordinator bot class. This bot has three main purposes:
 #1) Getting the latest server information of Creators.TF servers.
@@ -101,7 +107,7 @@ class GameCoordinatorBot(discord.Client):
         #Call for servers.
         self.providerdict = server_coordinator.CreateProviders()
 
-        # Update the 
+        # Update the users
         UserData.ReadUsers()
 
         self.loop_serverquerying.start()
@@ -112,7 +118,7 @@ class GameCoordinatorBot(discord.Client):
 
     async def on_ready(self):
         print("[START] Game Coordinator Bot has started.")
-        print(f"[START] Information: Version 0.1b, Created by ZoNiCaL, Modified by qualitycont. Bot Account: {self.user}")
+        print(f"[START] Information: Version 0.1c, Created by ZoNiCaL, Modified by qualitycont. Bot Account: {self.user}")
         
     #The on_message event. Whenever a message is sent on a server with the bot,
     #it picks it up and processes it in this function.
@@ -148,7 +154,8 @@ class GameCoordinatorBot(discord.Client):
             embedMessage.add_field(name=f"c!{arguments[0]}", value=info, inline=False)
         else:
             for cmd in cmdHelp:
-                embedMessage.add_field(name=f"c!{cmd}", value=cmdHelp[cmd], inline=False)
+                embedMessage.add_field(name=f"{cmd}", value=cmdHelp[cmd], inline=False)
+        await channel.send(f"<@{sender.id}>", embed=embedMessage)
 
     # c!setting. this is to change per user settings such as min and max players
     async def command_setting(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
@@ -156,18 +163,31 @@ class GameCoordinatorBot(discord.Client):
         if not len(arguments) == 2:
             embedMessage.add_field(name="Couldnt change setting! :tear:", value="You didnt specify exactly 2 parameters!", inline = False)
         else:
-            if not UserData.Users[sender.id]:
+            if not UserData.GetUser(sender.id):
                 UserData(sender.id)
 
             k = arguments[0] # name of the setting
             v = arguments[1] # the value to set it to
 
-            if UserData.Settings[k]:
-                UserData.Users[sender.id][k] = v
+            if k in UserData.Settings:
+                UserData.SetUserSetting(sender.id, k, v)
                 UserData.WriteUsers()
                 embedMessage.add_field(name="Setting Changed!", value=f"Setting {k} changed to {v}!", inline=False)
             else:
                 embedMessage.add_field(name="Couldnt change setting! :tear:", value=f"Setting {k} does not exist!", inline = False)
+        await channel.send(f"<@{sender.id}>", embed=embedMessage)
+
+    async def command_showsettings(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
+        embedMessage = discord.Embed(title="Discord Game Coordinator")
+
+        embedMessage.set_thumbnail(url=sender.avatar_url)
+        embedMessage.set_author(name=sender.name)
+        if not UserData.GetUser(sender.id):
+            UserData(sender.id)
+        
+        data = UserData.GetUser(sender.id)
+        for k in data:
+            embedMessage.add_field(name=f"{k}", value=f"{data[k]}", inline=False)
         await channel.send(f"<@{sender.id}>", embed=embedMessage)
 
     #c!findserver. This will construct an embed where users can select what they want.
@@ -412,7 +432,8 @@ class GameCoordinatorBot(discord.Client):
                     ServerCount += 1
 
                 providerObj.ProviderServers = NewServerList
-                print(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
+                if debug:
+                    print(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
 
     @tasks.loop(seconds=5)
     async def loop_lobbymatchmaking(self):
@@ -454,12 +475,14 @@ class GameCoordinatorBot(discord.Client):
                 print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby wants any map.")
 
             # finally, check if it fits into the Owners settings
-            settings = UserData.Users[lobbyObj.LobbyOwner.id]
+            settings = UserData.GetUser(lobbyObj.LobbyOwner.id)
 
-            if server.ServerPlayers < settings["min_players"]:
+            if server.ServerPlayers < int(settings["min_players"]): # because json has everything as string, we have to int() it here
+                print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatible, it has has less players then required from user settings")
                 return False # not enough players
             
-            if server.ServerPlayers > settings["max_players"]:
+            if server.ServerPlayers > int(settings["max_players"]): # same for this
+                print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatible, it has has more players then required from user settings")
                 return False # too many players
 
             #We've passed all of our checks. Lets make this the best server.
@@ -554,7 +577,8 @@ class GameCoordinatorBot(discord.Client):
         "c!play": command_findserver,
         "c!stop": command_stop,
         "c!stopsearch": command_stop,
-        "c!setting": command_setting
+        "c!setting": command_setting,
+        "c!settings": command_showsettings
     }
 
 gcObj = GameCoordinatorBot()

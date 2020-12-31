@@ -3,39 +3,46 @@ import json
 import os
 
 currentdir = os.path.dirname(os.path.abspath(__file__))
+DefaultSettings = { # DEFAULT SETTINGS, we need this for the constructor
+    # this probably shouldnt be as hardcoded as it is right now but i dont see us adding more settings
+    "min_players": 0,
+    "max_players": 32
+}
+Users = {}
 
 class UserData:
     UserID = -1
-    Settings = { # DEFAULT SETTINGS
-        "min_players": 0,
-        "max_players": 32
-    }
+    Settings = DefaultSettings
 
-    def __init__(self, id, settings = UserData.Settings):
-        if not hasattr(UserData, "Users"):
-            UserData.ReadUsers()
-
+    def __init__(self, id, settings = DefaultSettings ): # right now theres not much purpose to creating instances except registering users, will probably change this later
         self.UserID = id
         self.Settings = settings
 
-        UserData.Users[id] = settings
+        Users[id] = settings
+
+    @staticmethod
+    def GetUser(id):
+        if not id in Users:
+            return False
+        return Users[id]
+
+    @staticmethod
+    def SetUserSetting(id, key, val):
+        if not Users[id]: #incase the user isnt registered
+            return False
+        Users[id][key] = val
+        return True
 
     @staticmethod
     def ReadUsers():
-        if not hasattr(UserData, "Users"):
-            # i could also do this by setting a default value but i dont want Users to exist on a object level
-            UserData.Users = dict() # if Users doesnt exist, create it
-
-        with open(currentdir + "/UserData.json") as file: # thank you server_coordinator.py
+        with open(currentdir + "/data/UserData.json") as file: # thank you server_coordinator.py
             allUserData = json.load(file)["users"] #Load our information as JSON.
             for id in allUserData:
-                UserData(id, allUserData[id]["settings"])
+                UserData(int(id), allUserData[id]) #why must json get rid of data types??? why???
          
-        return UserData.Users # incase we want to use it immediately
+        return Users # incase we want to use it immediately
     
     @staticmethod
     def WriteUsers():
-        if not hasattr(UserData, "Users"): # if for some reason we write before read
-            return False
-        json.dump({"users":UserData.Users}) # dict to make it into the correct format
-        return True
+        with open(currentdir + "/data/UserData.json", "w") as file: # the same as before but writable
+            json.dump({"users":Users},file) # dict to make it into the correct format # not sure if this is the most effective way of doing this but fuck it
