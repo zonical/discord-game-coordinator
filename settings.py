@@ -6,7 +6,9 @@ currentdir = os.path.dirname(os.path.abspath(__file__))
 DefaultSettings = { # DEFAULT SETTINGS, we need this for the constructor
     # this probably shouldnt be as hardcoded as it is right now but i dont see us adding more settings
     "min_players": 0,
-    "max_players": 32
+    "max_players": 32,
+    "default_provider": None,
+    "default_region": None
 }
 Users = {}
 
@@ -21,9 +23,19 @@ class UserData:
         Users[id] = settings
 
     @staticmethod
+    def GetUsers():
+        return Users
+
+    @staticmethod
     def GetUser(id):
         if not id in Users:
             return False
+        return Users[id]
+
+    @staticmethod
+    def GetOrRegisterUser(id):
+        if not id in Users:
+            UserData(id)
         return Users[id]
 
     @staticmethod

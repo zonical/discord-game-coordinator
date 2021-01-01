@@ -182,10 +182,8 @@ class GameCoordinatorBot(discord.Client):
 
         embedMessage.set_thumbnail(url=sender.avatar_url)
         embedMessage.set_author(name=sender.name)
-        if not UserData.GetUser(sender.id):
-            UserData(sender.id)
         
-        data = UserData.GetUser(sender.id)
+        data = UserData.GetOrRegisterUser(sender.id)
         for k in data:
             embedMessage.add_field(name=f"{k}", value=f"{data[k]}", inline=False)
         await channel.send(f"<@{sender.id}>", embed=embedMessage)
@@ -210,8 +208,41 @@ class GameCoordinatorBot(discord.Client):
 
         actualMessage = await channel.send(embed=discord.Embed(title="Discord Game Coordinator."))
 
+        settings = UserData.GetOrRegisterUser(sender.id)
+
+        # confirmation emoji dict
+        confirmationEmojis = {
+            "✅": True,
+            "❌": False
+        }
+
+        # util function for checking if we want the default value
+        async def defaultCheck(settingK, settingV):
+            embedMessage = discord.Embed(title="Discord Game Coordinator")
+            embedMessage.add_field(name="Do you want to use the default setting?", value=f"You have a valid default value \"{settingV}\" for the setting {settingK}, do you want to use it?")
+
+            await actualMessage.edit(embed=embedMessage)
+            for emoji in confirmationEmojis:
+                await actualMessage.add_reaction(emoji)
+            
+            try: #Start our waiting process.
+                reaction, user = await self.wait_for('reaction_add', timeout=10.0, check=check)
+            except asyncio.TimeoutError: #We waited for too long :(
+                await channel.send(f"<@{sender.id}>, you took too long to confirm the default setting, assumed no.")
+                await actualMessage.clear_reactions() #Clear the reactions.
+                return False
+
+            await actualMessage.clear_reactions() #Clear the reactions again
+            if not reaction.emoji in confirmationEmojis:
+                return False # incase somebody adds a random emoji
+            
+            return confirmationEmojis[reaction.emoji]
+
+        defaultProvider = settings["default_provider"]
         if len(arguments) > 0 and str(arguments[0]).lower() in NameToProviderID: # are there any arguments? is the provider valid?
             theLobby.LobbyProvider = NameToProviderID[str(arguments[0]).lower()] # easy provider id getting
+        elif defaultProvider != None and defaultProvider in NameToProviderID and await defaultCheck("default_provider",defaultProvider): # if theres a default provider and the user wants to use it, no need for selection
+            theLobby.LobbyProvider = NameToProviderID[defaultProvider]
         else: # no arguments or invalid provider
             #Make the embed, with all of our providers.
             embedMessage = discord.Embed(title="Discord Game Coordinator.")
@@ -254,8 +285,11 @@ class GameCoordinatorBot(discord.Client):
         #Create our ProviderObject so we can use it for later things:
         ProviderObject = self.providerdict[theLobby.LobbyProvider]
 
+        defaultRegion = settings["default_region"]
         if len(arguments) > 1 and str(arguments[1]).lower() in NameToRegionID: # same as provider but with region
             theLobby.LobbyRegion = NameToRegionID[str(arguments[1]).lower()]
+        elif defaultRegion != None and defaultRegion in NameToRegionID and await defaultCheck("default_region",defaultRegion): # if theres a default region and the user wants to use it, no need for selection
+            theLobby.LobbyRegion = NameToRegionID[defaultRegion]
         else: #again, fall back to the reactions if theres no region
             #Make our second embed, with all of our regions.
             embedMessage = discord.Embed(title="Discord Game Coordinator.")
@@ -475,7 +509,7 @@ class GameCoordinatorBot(discord.Client):
                 print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby wants any map.")
 
             # finally, check if it fits into the Owners settings
-            settings = UserData.GetUser(lobbyObj.LobbyOwner.id)
+            settings = UserData.GetOrRegisterUser(lobbyObj.LobbyOwner.id)
 
             if server.ServerPlayers < int(settings["min_players"]): # because json has everything as string, we have to int() it here
                 print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatible, it has has less players then required from user settings")
