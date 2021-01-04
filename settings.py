@@ -75,7 +75,7 @@ class UserData:
 
     @staticmethod
     def SetUserSetting(id, key, val):
-        if not Users[id]: #incase the user isnt registered
+        if not id in Users: #incase the user isnt registered
             return False
         Users[id][key] = val
         return True
@@ -93,3 +93,58 @@ class UserData:
     def WriteUsers():
         with open(currentdir + "/data/UserData.json", "w") as file: # the same as before but writable
             json.dump({"users":Users},file) # dict to make it into the correct format # not sure if this is the most effective way of doing this but fuck it
+
+DefaultServerSettings = { # now this doesnt need to be changable since this exists pretty much for these two settings
+    "queue_channel": False,
+    "queue_notify_role": False
+}
+
+Servers = {} # same as the users dict, doesnt actually store instances
+class ServerData:
+    ServerID = -1
+    Settings = DefaultServerSettings
+
+    def __init__(self, id, settings = Settings ): # right now theres not much purpose to creating instances except registering users, will probably change this later
+        self.ServerID = id
+        self.Settings = settings
+
+        Servers[id] = settings
+
+    @staticmethod
+    def GetAll():
+        return Servers
+
+    @staticmethod
+    def Get(id):
+        return Servers[id]
+    
+    @staticmethod
+    def GetOrRegister(id):
+        if not id in Servers:
+            return ServerData(id)
+        return Servers[id]
+
+    @staticmethod
+    def GetServerSetting(id, key):
+        if not id in Servers: #incase the user isnt registered
+            return False
+        return Servers[id][key]
+
+    @staticmethod
+    def SetServerSetting(id, key, val):
+        if not Servers[id]: #incase the user isnt registered
+            return False
+        Servers[id][key] = val
+        return True
+
+    @staticmethod
+    def ReadUsers():
+        with open(currentdir + "/data/ServerData.json") as file: # thank you server_coordinator.py
+            allServerData = json.load(file) #Load our information as JSON.
+            for id in allServerData:
+                ServerData(int(id), allServerData[id]) #why must json get rid of data types??? why???
+    
+    @staticmethod
+    def WriteUsers():
+        with open(currentdir + "/data/ServerData.json", "w") as file: # the same as before but writable
+            json.dump(Servers,file)
