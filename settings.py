@@ -3,6 +3,12 @@ import json
 import os
 
 currentdir = os.path.dirname(os.path.abspath(__file__))
+
+
+"""
+
+HARDCODED VALUES DISPLEASE ME, SO I HAVE REMOVED THEM!
+
 DefaultSettings = { # DEFAULT SETTINGS, we need this for the constructor
     # this probably shouldnt be as hardcoded as it is right now but i dont see us adding more settings
     "min_players": 0,
@@ -10,13 +16,42 @@ DefaultSettings = { # DEFAULT SETTINGS, we need this for the constructor
     "default_provider": None,
     "default_region": None
 }
-Users = {}
+"""
 
+Settings = {}
+class UserSettings:
+    Key = "",
+    Value = -1,
+    DisplayName = Key
+
+    def __init__(self, key, value, displayname): # you really shouldnt call this outside of readsettings since it doesnt get saved
+        self.Key = key
+        self.Value = value
+        self.DisplayName = displayname
+
+        Settings[key] = self
+
+    @staticmethod
+    def Read():
+        with open(currentdir + "/Settings.json") as file: # thank you server_coordinator.py
+            allSettings = json.load(file)
+            for key in allSettings:
+                UserSettings(key, allSettings[key]['value'], allSettings[key]["displayname"]) # this time we can let the code handle the type conversion
+
+    @staticmethod
+    def GetAll():
+        return Settings
+
+    @staticmethod
+    def Get(key): # this unlike GetUser returns the settings object, not the value so be careful
+        return Settings[key]
+
+Users = {}
 class UserData:
     UserID = -1
-    Settings = DefaultSettings
+    Settings = Settings
 
-    def __init__(self, id, settings = DefaultSettings ): # right now theres not much purpose to creating instances except registering users, will probably change this later
+    def __init__(self, id, settings = Settings ): # right now theres not much purpose to creating instances except registering users, will probably change this later
         self.UserID = id
         self.Settings = settings
 
