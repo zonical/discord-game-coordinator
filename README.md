@@ -53,3 +53,6 @@ If you wish to add your own regions, goto `main.py`, line 24; add or remove item
 
 ## Reporting Issues, or suggesting features:
 If you have any issues with setting up the Game Coordinator for your own server, or if you want to make a feature request, the best way to get to me is DMing me on Discord at ZoNiCaL#9740. My DM's are always open, and a friend request isn't required. Feel free to make pull requests with new features; I won't always be checking this repo everyday, but I'll eventually see something if you post it.
+
+## Special Mentions:
+Big Mc'thankies from Mc'spankies to [Qualitycont](https://github.com/qualitycont) for contributing a lot of quality-of-life changes to the bot.

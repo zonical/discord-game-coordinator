@@ -91,6 +91,40 @@ debug = False
 if len(argv) > 2:
     debug = bool(argv[2])
 
+NameToProviderID = {
+    #Name: provider id
+    "creators.tf": 1,
+    "c.tf": 1,
+    "creators": 1,
+    "ctf": 1,
+    "bmod": 2,
+    "balancemod": 2,
+    "balancemod/creators": 2,
+    "events": 3,
+    "event": 3
+}
+
+NameToRegionID = {
+    #name: region id
+    "usa": 0,
+    "us": 0,
+    "na": 0,
+    "america": 0,
+    "europe": 1,
+    "eu": 1,
+    "russia": 2,
+    "ru": 2,
+    "oceania": 3,
+    "australia": 3,
+    "aus": 3,
+    "singapore": 4,
+    "brazil": 5,
+    "bra": 5,
+    "norway": 6,
+    "nor": 6
+}
+
+
 #The Game Coordinator bot class. This bot has three main purposes:
 #1) Getting the latest server information of Creators.TF servers.
 #2) Providing a matchmaking service for the C.TF Discord.
@@ -243,6 +277,15 @@ class GameCoordinatorBot(discord.Client):
             theLobby.LobbyProvider = NameToProviderID[str(arguments[0]).lower()] # easy provider id getting
         elif defaultProvider != None and defaultProvider in NameToProviderID and await defaultCheck("default_provider",defaultProvider): # if theres a default provider and the user wants to use it, no need for selection
             theLobby.LobbyProvider = NameToProviderID[defaultProvider]
+
+        #rthings we might need later
+        def check(reaction, user):
+            return user == sender
+
+        actualMessage = await channel.send(embed=discord.Embed(title="Discord Game Coordinator."))
+
+        if len(arguments) > 0 and str(arguments[0]).lower() in NameToProviderID: # are there any arguments? is the provider valid?
+            theLobby.LobbyProvider = NameToProviderID[str(arguments[0]).lower()] # easy provider id getting
         else: # no arguments or invalid provider
             #Make the embed, with all of our providers.
             embedMessage = discord.Embed(title="Discord Game Coordinator.")
