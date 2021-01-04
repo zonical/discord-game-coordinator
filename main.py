@@ -124,7 +124,7 @@ class GameCoordinatorBot(discord.Client):
                 return True, self.queuelist.index(queue), True
             elif id in queue.Members:
                 return True, self.queuelist.index(queue), False
-        return False, None
+        return False, None, False
 
     def __init__(self):
         #Initalise the bot.
@@ -246,8 +246,10 @@ class GameCoordinatorBot(discord.Client):
         channel.send(embed=embedMessage)
 
     async def command_startqueue(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
-        if sender.id in self.lobbylist or self.isInQueue(sender.id)[0]:
+        inQueue, _1, _2 = self.isInQueue(sender.id)
+        if sender.id in self.lobbylist or inQueue:
             #Construct an embed.
+            print(inQueue)
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
