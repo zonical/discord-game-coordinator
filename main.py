@@ -107,6 +107,9 @@ def defaultEmbed():
 #1) Getting the latest server information of Creators.TF servers.
 #2) Providing a matchmaking service for the C.TF Discord.
 #3) Having this matchmaking service be customisable (e.g search by region, map, etc.)
+
+botVersion = "0.1d"
+
 class GameCoordinatorBot(discord.Client):
     providerdict = {}
     lobbylist = []
@@ -151,7 +154,7 @@ class GameCoordinatorBot(discord.Client):
 
     async def on_ready(self):
         print("[START] Game Coordinator Bot has started.")
-        print(f"[START] Information: Version 0.1c, Created by ZoNiCaL, Modified by qualitycont. Bot Account: {self.user}")
+        print(f"[START] Information: Version {botVersion}, Created by ZoNiCaL, Modified by qualitycont. Bot Account: {self.user}")
         
     #The on_message event. Whenever a message is sent on a server with the bot,
     #it picks it up and processes it in this function.
