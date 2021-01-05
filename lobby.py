@@ -1,4 +1,5 @@
 import discord
+import asyncio
 
 class Lobby:
     Owner = None
@@ -18,23 +19,23 @@ class QueueLobby(Lobby):
     def MemberCount(self):
         return len(self.Members)+1
     
-    def AddMember(self, member: discord.Client):
+    async def AddMember(self, member: discord.Client):
         self.Members.insert(member)
-        updateMsg(self)
+        await updateMsg(self)
     
-    def RemoveMember(self, member:discord.Client):
+    async def RemoveMember(self, member:discord.Client):
         if member in self.Members:
             self.Members.remove(member)
-            updateMsg(self)
+            await updateMsg(self)
     
-    def Close(self):
+    async def Close(self):
         newEmbed = discord.Embed(title="Discord Game Coordinaotr")
         newEmbed.add_field(name="Queue Done", value="A server has been found, you can no longer join this queue.")
-        self.MessageToUpdate.edit(embed=newEmbed)
+        await self.MessageToUpdate.edit(embed=newEmbed)
 
-def updateMsg(queue: QueueLobby):
+async def updateMsg(queue: QueueLobby):
     # upadte the player
     newEmbed = queue.MessageToUpdate.embeds[0]
     newEmbed.set_field_at(index=69, name="Players Queueing", value=f"{queue.Owner}, {queue.Members}", inline=True) 
 
-    queue.MessageToUpdate.edit(embed=newEmbed)
+    await queue.MessageToUpdate.edit(embed=newEmbed)

@@ -95,7 +95,7 @@ if len(argv) > 2:
     debug = bool(argv[2])
 
 # global utility functions
-def printDebug(str):
+def debugPrint(str):
     if debug:
         print(str)
 
@@ -119,11 +119,15 @@ class GameCoordinatorBot(discord.Client):
     queuelist = []
 
     def isInQueue(self, id):
+        print(id)
         for queue in self.queuelist:
-            if queue.Owner == id:
+            print(queue)
+            if queue.Owner.id == id:
+                print(f"{queue.Owner.id} == {id}")
                 return True, self.queuelist.index(queue), True
             for member in queue.Members:
                 if member.id == id:
+                    print(f"{member.id} == {id}")
                     return True, self.queuelist.index(queue), False
         return False, None, False
 
@@ -170,7 +174,7 @@ class GameCoordinatorBot(discord.Client):
         print(f"[COMMAND] Command coming in from {message.author}: {actualCommand}")
 
         if actualCommand not in self.commands:
-            printDebug(f"[COMMAND] Invalid command from {message.author}: {actualCommand}")
+            debugPrint(f"[COMMAND] Invalid command from {message.author}: {actualCommand}")
             return
         
         #We have a dictionary object full of command names, and the functions that we're calling.
@@ -250,7 +254,8 @@ class GameCoordinatorBot(discord.Client):
         inQueue, _1, _2 = self.isInQueue(sender.id)
         if sender.id in self.lobbylist or inQueue:
             #Construct an embed.
-            print(inQueue)
+            print(f"inQueue:{inQueue}")
+            print(f"sender.id in self.lobbylist: {sender.id in self.lobbylist}")
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
@@ -305,7 +310,7 @@ class GameCoordinatorBot(discord.Client):
         #Get the region emoji
         regionEmoji = RegionIDToInformation[theQueue.Region][1]
 
-        broadcastChannel = get(channel.guild.text_channels, id=ServerData.GetServerSetting(channel.guild.id, "queue_channel"))
+        broadcastChannel = get(channel.guild.text_channels, name=ServerData.GetServerSetting(channel.guild.id, "queue_channel"))
         if broadcastChannel:
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Queue Created!", value=f"More information in #{broadcastChannel}!",inline=False)
@@ -351,6 +356,7 @@ class GameCoordinatorBot(discord.Client):
         id = channel.guild.id
         ServerData.GetOrRegister(id)
         ServerData.SetServerSetting(id, arguments[0], arguments[1])
+        ServerData.WriteUsers()
 
         embedMessage = defaultEmbed()
         embedMessage.add_field(name="Setting Changed!", value=f"Setting {arguments[0]} changed to {arguments[1]}",inline=False)
@@ -563,10 +569,14 @@ class GameCoordinatorBot(discord.Client):
         elif inQueue:
             queueObj = self.queuelist[queue]
             if isOwner:
-                queueObj.Close()
+                await queueObj.Close()
             else:
-                queueObj.Close()
+                await queueObj.Close()
             self.queuelist.remove(queueObj)
+            #Construct an embed.
+            embedMessage = defaultEmbed()
+            embedMessage.add_field(name="Unexpected landing! :cry:", value="You have been removed from the matchmaking queue. You can requeue with the command c!play.",inline=False)
+            await channel.send(f"<@{sender.id}>", embed=embedMessage)
         else:
             await channel.send(f"<@{sender.id}>, you are currently not in the matchmaking queue.")
 
@@ -645,14 +655,14 @@ class GameCoordinatorBot(discord.Client):
                     ServerCount += 1
 
                 providerObj.ProviderServers = NewServerList
-                printDebug(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
+                debugPrint(f"[SERVER] Provider {providerObj.ProviderName} processed {ServerCount} servers.")
 
     @tasks.loop(seconds=15)
     async def loop_querymatchmaking(self):
         def PerformChecks(queueObj : lobby.QueueLobby, server): 
             #Compatiable region?
             if queueObj.Region != server.ServerRegionID:
-                printDebug(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Server Region {server.ServerRegionID} != Lobby Region {queueObj.Region}")
+                debugPrint(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Server Region {server.ServerRegionID} != Lobby Region {queueObj.Region}")
                 return False
 
             #with players in queue
@@ -660,11 +670,11 @@ class GameCoordinatorBot(discord.Client):
 
             #Do we meet the player target?
             if theoreticalPlayers < queueObj.PlayerTarget:
-                printDebug(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Not enough players.")
+                debugPrint(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Not enough players.")
                 return False
 
             if server.ServerPlayers > queueObj.PlayerTarget+1: #+1 so theres a need for at least one more person
-                printDebug(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Too Many players.")
+                debugPrint(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Too Many players.")
                 return False
 
             #We have specified maps/gamemodes we want to play, find them:
@@ -673,19 +683,19 @@ class GameCoordinatorBot(discord.Client):
 
                 #Is one of our maps on this server currently?
                 for item in queueObj.Maps:
-                    printDebug(f"[LOBBY] Map Comparison: {item} -> {server.ServerMap}")
+                    debugPrint(f"[LOBBY] Map Comparison: {item} -> {server.ServerMap}")
                     if item not in server.ServerMap:
                         continue
                     else: #Found it!
                         FoundMap = True
-                        printDebug(f"[LOBBY] {queueObj.Owner}: Map found!")
+                        debugPrint(f"[LOBBY] {queueObj.Owner}: Map found!")
                         break
 
                 if FoundMap == False:
-                    printDebug(f"[LOBBY] {queueObj.Owner}'s lqueue is incompatiable. No map found.")
+                    debugPrint(f"[LOBBY] {queueObj.Owner}'s lqueue is incompatiable. No map found.")
                     return False
             else:
-                printDebug(f"[LOBBY] {queueObj.Owner}'s queue wants any map.")
+                debugPrint(f"[LOBBY] {queueObj.Owner}'s queue wants any map.")
 
             #We've passed all of our checks. Lets make this the best server.
             self.bestServer = server
@@ -693,7 +703,7 @@ class GameCoordinatorBot(discord.Client):
 
         for queueObj in self.queuelist.copy():
             await asyncio.sleep(0.5)
-            printDebug(f"[LOBBY] Processing Lobby owned by: {queueObj.Owner}")
+            debugPrint(f"[LOBBY] Processing Lobby owned by: {queueObj.Owner}")
             self.bestServer = None #Store the best server that we have so far.
             provider = self.providerdict[queueObj.Provider]
             
@@ -757,8 +767,8 @@ class GameCoordinatorBot(discord.Client):
 
             await queueObj.ChannelSentIn.send(memberPingString, embed=embedMessage) #Edit the original message.
 
-            queueObj.Close()
-            self.queuelist.pop(queueObj.Owner.id)
+            await queueObj.Close()
+            self.queuelist.remove(queueObj)
             await asyncio.sleep(0.5)
 
     @tasks.loop(seconds=5)
@@ -769,18 +779,18 @@ class GameCoordinatorBot(discord.Client):
 
             #Compatiable region?
             if lobbyObj.Region != server.ServerRegionID:
-                printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. Server Region {server.ServerRegionID} != Lobby Region {lobbyObj.Region}")
+                debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. Server Region {server.ServerRegionID} != Lobby Region {lobbyObj.Region}")
                 return False
 
             #Is the server full?
             if server.ServerPlayers == server.ServerMaxPlayers:
-                printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. Server is full.")
+                debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. Server is full.")
                 return False
 
             #Has more than the "best server" of players?
             if self.bestServer: #The server could be None at this point, so just ignore the check if it is.
                 if self.bestServer.ServerPlayers > server.ServerPlayers:
-                    printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. The best server has more players. ({self.bestServer.ServerPlayers} > {server.ServerPlayers})")
+                    debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. The best server has more players. ({self.bestServer.ServerPlayers} > {server.ServerPlayers})")
                     return False
 
             #We have specified maps/gamemodes we want to play, find them:
@@ -789,26 +799,26 @@ class GameCoordinatorBot(discord.Client):
 
                 #Is one of our maps on this server currently?
                 for item in lobbyObj.Maps:
-                    printDebug(f"[LOBBY] Map Comparison: {item} -> {server.ServerMap}")
+                    debugPrint(f"[LOBBY] Map Comparison: {item} -> {server.ServerMap}")
                     if item not in server.ServerMap:
                         continue
                     else: #Found it!
                         FoundMap = True
-                        printDebug(f"[LOBBY] {lobbyObj.Owner}: Map found!")
+                        debugPrint(f"[LOBBY] {lobbyObj.Owner}: Map found!")
                         break
 
                 if FoundMap == False:
-                    printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. No map found.")
+                    debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatiable. No map found.")
                     return False
             else:
-                printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby wants any map.")
+                debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby wants any map.")
 
             if server.ServerPlayers < int(settings["min_players"]): # because json has everything as string, we have to int() it here
-                printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatible, it has has less players then required from user settings")
+                debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatible, it has has less players then required from user settings")
                 return False # not enough players
             
             if server.ServerPlayers > int(settings["max_players"]): # same for this
-                printDebug(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatible, it has has more players then required from user settings")
+                debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatible, it has has more players then required from user settings")
                 return False # too many players
 
             #We've passed all of our checks. Lets make this the best server.
@@ -819,7 +829,7 @@ class GameCoordinatorBot(discord.Client):
         for key in self.lobbylist.copy():
             lobbyObj = self.lobbylist.copy()[key]
             await asyncio.sleep(0.5)
-            printDebug(f"[LOBBY] Processing Lobby owned by: {lobbyObj.Owner}")
+            debugPrint(f"[LOBBY] Processing Lobby owned by: {lobbyObj.Owner}")
             self.bestServer = None #Store the best server that we have so far.
             provider = self.providerdict[lobbyObj.Provider]
             
