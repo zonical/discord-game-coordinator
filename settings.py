@@ -116,6 +116,8 @@ class ServerData:
 
     @staticmethod
     def Get(id):
+        if not id in Servers: #incase the server isnt registered
+            return False
         return Servers[id]
     
     @staticmethod
@@ -126,25 +128,25 @@ class ServerData:
 
     @staticmethod
     def GetServerSetting(id, key):
-        if not id in Servers: #incase the user isnt registered
+        if not id in Servers: #incase the server isnt registered
             return False
         return Servers[id][key]
 
     @staticmethod
     def SetServerSetting(id, key, val):
-        if not Servers[id]: #incase the user isnt registered
+        if not Servers[id]: #incase the server isnt registered
             return False
         Servers[id][key] = val
         return True
 
     @staticmethod
-    def ReadUsers():
-        with open(currentdir + "/data/ServerData.json") as file: # thank you server_coordinator.py
+    def Read():
+        with open(currentdir + "/data/ServerData.json", "r") as file: # thank you server_coordinator.py
             allServerData = json.load(file) #Load our information as JSON.
             for id in allServerData:
                 ServerData(int(id), allServerData[id]) #why must json get rid of data types??? why???
     
     @staticmethod
-    def WriteUsers():
+    def Write():
         with open(currentdir + "/data/ServerData.json", "w") as file: # the same as before but writable
             json.dump(Servers,file)

@@ -9,7 +9,7 @@ import re
 from discord.ext import commands, tasks
 from discord.utils import get
 from sys import argv
-from settings import UserData, UserSettings, ServerData
+from settings import UserData, UserSettings, ServerData, DefaultServerSettings
 
 IDtoEmojis = {
     1: ("1️⃣", ":one:"),
@@ -119,15 +119,11 @@ class GameCoordinatorBot(discord.Client):
     queuelist = []
 
     def isInQueue(self, id):
-        print(id)
         for queue in self.queuelist:
-            print(queue)
             if queue.Owner.id == id:
-                print(f"{queue.Owner.id} == {id}")
                 return True, self.queuelist.index(queue), True
             for member in queue.Members:
                 if member.id == id:
-                    print(f"{member.id} == {id}")
                     return True, self.queuelist.index(queue), False
         return False, None, False
 
@@ -137,6 +133,9 @@ class GameCoordinatorBot(discord.Client):
 
         #Call for servers.
         self.providerdict = server_coordinator.CreateProviders()
+
+        # Load default server stuff too
+        ServerData.Read()
 
         # Load default settings
         UserSettings.Read()
@@ -254,8 +253,6 @@ class GameCoordinatorBot(discord.Client):
         inQueue, _1, _2 = self.isInQueue(sender.id)
         if sender.id in self.lobbylist or inQueue:
             #Construct an embed.
-            print(f"inQueue:{inQueue}")
-            print(f"sender.id in self.lobbylist: {sender.id in self.lobbylist}")
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
@@ -324,7 +321,12 @@ class GameCoordinatorBot(discord.Client):
             extraEmbedMessage.insert_field_at(69, name="Players Queueing", value=f"{sender.name}", inline=True) # we need to edit this later so im using le funny number as an index
             extraEmbedMessage.add_field(name="Join this queue!", value=f"You can join this queue using c!join {len(self.queuelist)}")
 
-            theQueue.MessageToUpdate = await broadcastChannel.send(embed=extraEmbedMessage)
+            toPingString = f"<@{sender.id}>"
+            broadcastRole = ServerData.GetServerSetting(channel.guild.id, "queue_notify_role")
+            if broadcastRole:
+                toPingString += f" {broadcastRole}"
+
+            theQueue.MessageToUpdate = await broadcastChannel.send(content=toPingString,embed=extraEmbedMessage)
         else:
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Provider", value=f"{providerName}", inline=True)
@@ -349,14 +351,20 @@ class GameCoordinatorBot(discord.Client):
 
         if len(arguments) < 2:
             embedMessage = defaultEmbed()
-            embedMessage.add_field(name="Unexpected landing! :tear:", value="You did not specify enough arguments to ues this command..",inline=False)
+            embedMessage.add_field(name="Unexpected landing! :tear:", value="You did not specify enough arguments to uss this command.",inline=False)
+            await channel.send(f"<@{sender.id}>", embed=embedMessage)
+            return
+
+        if not arguments[0] in DefaultServerSettings:
+            embedMessage = defaultEmbed()
+            embedMessage.add_field(name="Unexpected landing! :tear:", value=f"The server setting {arguments[0]} does not exist!",inline=False)
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
             return
 
         id = channel.guild.id
         ServerData.GetOrRegister(id)
         ServerData.SetServerSetting(id, arguments[0], arguments[1])
-        ServerData.WriteUsers()
+        ServerData.Write()
 
         embedMessage = defaultEmbed()
         embedMessage.add_field(name="Setting Changed!", value=f"Setting {arguments[0]} changed to {arguments[1]}",inline=False)
@@ -673,7 +681,7 @@ class GameCoordinatorBot(discord.Client):
                 debugPrint(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Not enough players.")
                 return False
 
-            if server.ServerPlayers > queueObj.PlayerTarget+1: #+1 so theres a need for at least one more person
+            if server.ServerPlayers > queueObj.PlayerTarget: #+1 so theres a need for at least one more person
                 debugPrint(f"[LOBBY] {queueObj.Owner}'s queue is incompatiable. Too Many players.")
                 return False
 
