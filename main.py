@@ -122,8 +122,9 @@ class GameCoordinatorBot(discord.Client):
         for queue in self.queuelist:
             if queue.Owner == id:
                 return True, self.queuelist.index(queue), True
-            elif id in queue.Members:
-                return True, self.queuelist.index(queue), False
+            for member in queue.Members:
+                if member.id == id:
+                    return True, self.queuelist.index(queue), False
         return False, None, False
 
     def __init__(self):
@@ -750,13 +751,14 @@ class GameCoordinatorBot(discord.Client):
             embedMessage.add_field(name="Connect using Steam:", value=f"steam://connect/{self.bestServer.ServerAddress[0]}:{self.bestServer.ServerAddress[1]}", inline=False)
             embedMessage.add_field(name="Or use the Console:", value=f"connect {self.bestServer.ServerAddress[0]}:{self.bestServer.ServerAddress[1]}", inline=False)
 
-            memberPingString = "<@{queueObj.Owner.id}>"
+            memberPingString = f"<@{queueObj.Owner.id}>"
             for member in queueObj.Members:
                 memberPingString += f" <@{member.id}>"
 
             await queueObj.ChannelSentIn.send(memberPingString, embed=embedMessage) #Edit the original message.
 
-            self.lobbylist.pop(queueObj.Owner.id)
+            queueObj.Close()
+            self.queuelist.pop(queueObj.Owner.id)
             await asyncio.sleep(0.5)
 
     @tasks.loop(seconds=5)
