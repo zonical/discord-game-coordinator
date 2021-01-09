@@ -19,6 +19,7 @@ DefaultSettings = { # DEFAULT SETTINGS, we need this for the constructor
 """
 
 Settings = {}
+SettingsSimple = {} # values only
 class UserSettings:
     Key = "",
     Value = -1,
@@ -30,6 +31,7 @@ class UserSettings:
         self.DisplayName = displayname
 
         Settings[key] = self
+        SettingsSimple[key] = value
 
     @staticmethod
     def Read():
@@ -51,7 +53,7 @@ class UserData:
     UserID = -1
     Settings = Settings
 
-    def __init__(self, id, settings = Settings ): # right now theres not much purpose to creating instances except registering users, will probably change this later
+    def __init__(self, id, settings = SettingsSimple ): # right now theres not much purpose to creating instances except registering users, will probably change this later
         self.UserID = id
         self.Settings = settings
 
@@ -92,7 +94,8 @@ class UserData:
                 os.makedirs("data")
             with open(currentdir + "/data/UserData.json", "w") as file: # the same as before but writable
                 json.dump({},file)
-         
+        
+        
         return Users # incase we want to use it immediately
     
     @staticmethod

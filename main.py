@@ -147,11 +147,20 @@ botVersion = "0.1d"
 class GameCoordinatorBot(discord.Client):
     providerdict = {}
     lobbylist = []
-    # waitinglist = [] this does nothing so i removed it
+    idToLobbyOwner = []
 
-    @property
-    def queueingAmount(self):
-        return len(self.lobbylist)
+    def IsInLobby(self, id): # returns the user is in a lobby and if yes, what lobby id
+        for owner in self.idToLobbyOwner:
+            if id == owner :
+                return True, self.idToLobbyOwner.index(id)
+        return False, None
+
+    def closeLobby(self, id): # WARNING: ID = OWNER ID!!!
+        lobbyId = self.idToLobbyOwner.index(id)
+        self.lobbylist.pop(lobbyId)
+        self.idToLobbyOwner.pop(lobbyId)
+            
+    # waitinglist = [] this does nothing so i removed it
 
     queuelist = []
 
@@ -163,6 +172,7 @@ class GameCoordinatorBot(discord.Client):
                 if member.id == id:
                     return True, self.queuelist.index(queue), False
         return False, None, False
+
 
     def __init__(self):
         #Initalise the bot.
@@ -233,8 +243,7 @@ class GameCoordinatorBot(discord.Client):
         if not len(arguments) == 2:
             embedMessage.add_field(name="Couldnt change setting! :tear:", value="You didnt specify exactly 2 parameters!", inline = False)
         else:
-            if not UserData.GetUser(sender.id):
-                UserData(sender.id)
+            UserData.GetOrRegisterUser(sender.id)
 
             k = arguments[0] # name of the setting
             v = arguments[1] # the value to set it to
@@ -259,7 +268,7 @@ class GameCoordinatorBot(discord.Client):
         await channel.send(f"<@{sender.id}>", embed=embedMessage)
 
     async def command_joinqueue(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
-        if sender.id in self.lobbylist or self.isInQueue(sender.id)[0]:
+        if self.IsInLobby(sender.id)[0] or self.isInQueue(sender.id)[0]:
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
@@ -288,8 +297,7 @@ class GameCoordinatorBot(discord.Client):
 
     # COMMAND: STARTQUEUE
     async def command_startqueue(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
-        inQueue, _1, _2 = self.isInQueue(sender.id)
-        if sender.id in self.lobbylist or inQueue:
+        if self.IsInLobby(sender.id)[0] or self.isInQueue(sender.id)[0]:
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
@@ -418,7 +426,7 @@ class GameCoordinatorBot(discord.Client):
 
     #c!findserver. This will construct an embed where users can select what they want.
     async def command_findserver(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
-        if sender.id in self.lobbylist or self.isInQueue(sender.id):
+        if self.IsInLobby(sender.id)[0] or self.isInQueue(sender.id)[0]:
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
@@ -500,15 +508,15 @@ class GameCoordinatorBot(discord.Client):
             #Set our provider by grabbing a value from the dict.
             for regionID, emojituple in RegionIDToInformation.items():
                 if (str(reaction.emoji) == emojituple[0]):
-                    theLobby.LobbyRegion = regionID
+                    theLobby.Region = regionID
                     break
             
             #Could not grab the emoji :(
-            if (theLobby.LobbyRegion == -1):
-            for providerID, emoji in IDtoEmojis.items():
-                if (str(reaction.emoji) == emoji[0]):
-                    theLobby.Provider = providerID
-                    break
+            if (theLobby.Region == -1):
+                for providerID, emoji in IDtoEmojis.items():
+                    if (str(reaction.emoji) == emoji[0]):
+                        theLobby.Provider = providerID
+                        break
         
             #Could not grab the emoji :(
             if (theLobby.Provider == -1):
@@ -607,7 +615,7 @@ class GameCoordinatorBot(discord.Client):
         regionEmoji = RegionIDToInformation[theLobby.Region][1]
 
         #Get the region emoji
-        regionEmoji = RegionIDToInformation[theLobby.LobbyRegion][1]
+        regionEmoji = RegionIDToInformation[theLobby.Region][1]
 
         #Make our fourth embed, to start searching.
         embedMessage = defaultEmbed()
@@ -618,13 +626,17 @@ class GameCoordinatorBot(discord.Client):
 
         await actualMessage.edit(embed=embedMessage) #Edit the original message.
         print(f"[LOBBY] Final constructed lobby:\n", theLobby.Owner, theLobby.Provider, theLobby.Region, theLobby.ChannelSentIn)
-        self.lobbylist[sender.id] = theLobby
+
+        # since the discord user ids are very long, we use this instead
+        self.idToLobbyOwner.append(sender.id)
+        self.lobbylist.append(theLobby)
         return
     #c!stop. Stops searching for servers.
     async def command_stop(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
+        inLobby, lobby = self.IsInLobby(sender.id)
         inQueue, queue, isOwner = self.isInQueue(sender.id)
-        if sender.id in self.lobbylist:
-            self.lobbylist.pop(sender.id) #Remove.
+        if inLobby:
+            self.closeLobby(sender.id)
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :cry:", value="You have been removed from the matchmaking queue. You can requeue with the command c!play.",inline=False)
@@ -632,10 +644,10 @@ class GameCoordinatorBot(discord.Client):
         elif inQueue:
             queueObj = self.queuelist[queue]
             if isOwner:
+                self.queuelist.remove(queueObj)
                 await queueObj.Close()
             else:
-                await queueObj.Close()
-            self.queuelist.remove(queueObj)
+                await queueObj.RemoveMember(sender)
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :cry:", value="You have been removed from the matchmaking queue. You can requeue with the command c!play.",inline=False)
@@ -884,24 +896,12 @@ class GameCoordinatorBot(discord.Client):
                 debugPrint(f"[LOBBY] {lobbyObj.Owner}'s lobby is incompatible, it has has more players then required from user settings")
                 return False # too many players
 
-            # finally, check if it fits into the Owners settings
-            settings = UserData.GetOrRegisterUser(lobbyObj.LobbyOwner.id)
-
-            if server.ServerPlayers < int(settings["min_players"]): # because json has everything as string, we have to int() it here
-                print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatible, it has has less players then required from user settings")
-                return False # not enough players
-            
-            if server.ServerPlayers > int(settings["max_players"]): # same for this
-                print(f"[LOBBY] {lobbyObj.LobbyOwner}'s lobby is incompatible, it has has more players then required from user settings")
-                return False # too many players
-
             #We've passed all of our checks. Lets make this the best server.
             self.bestServer = server
             return True
 
         #Loop through all the lobbies currently in our queue.
-        for key in self.lobbylist.copy():
-            lobbyObj = self.lobbylist.copy()[key]
+        for lobbyObj in self.lobbylist.copy():
             await asyncio.sleep(0.5)
             debugPrint(f"[LOBBY] Processing Lobby owned by: {lobbyObj.Owner}")
             self.bestServer = None #Store the best server that we have so far.
@@ -977,7 +977,7 @@ class GameCoordinatorBot(discord.Client):
 
             await lobbyObj.ChannelSentIn.send(f"<@{lobbyObj.Owner.id}>", embed=embedMessage) #Edit the original message.
 
-            self.lobbylist.pop(lobbyObj.Owner.id)
+            self.closeLobby(lobbyObj.Owner.id)
             await asyncio.sleep(0.5)
 
     commands = {
