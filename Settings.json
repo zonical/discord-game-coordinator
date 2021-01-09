@@ -1,0 +1,18 @@
+{
+    "min_players": {
+        "value": 8,
+        "displayname": "Minimum  amount of players"
+    },
+    "max_players": {
+        "value": 32,
+        "displayname": "Maximum amount of players"
+    },
+    "default_provider": {
+        "value": null,
+        "displayname": "Default server provider"
+    },
+    "default_region": {
+        "value": null,
+        "displayname": "Default server region"
+    }
+}
