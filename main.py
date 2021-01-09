@@ -225,7 +225,7 @@ class GameCoordinatorBot(discord.Client):
         await channel.send(f"<@{sender.id}>", embed=embedMessage)
 
     async def command_joinqueue(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
-        if sender.id in self.lobbylist or self.isInQueue(sender.id):
+        if sender.id in self.lobbylist or self.isInQueue(sender.id)[0]:
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
@@ -246,18 +246,26 @@ class GameCoordinatorBot(discord.Client):
             await channel.send(f"<@{sender.id}>",embed=embedMessage)
             return
         
-        self.queuelist[id].AddMember(sender)
+        await self.queuelist[id].AddMember(sender)
 
         embedMessage = defaultEmbed()
         embedMessage.add_field(name="Blast off! :sunglasses:", value=f"You have joined queue #{id}!",inline=False)
-        channel.send(embed=embedMessage)
+        await channel.send(embed=embedMessage)
 
+    # COMMAND: STARTQUEUE
     async def command_startqueue(self, sender : discord.User, channel : discord.TextChannel, arguments : list):
         inQueue, _1, _2 = self.isInQueue(sender.id)
         if sender.id in self.lobbylist or inQueue:
             #Construct an embed.
             embedMessage = defaultEmbed()
             embedMessage.add_field(name="Unexpected landing! :tear:", value="You are already in the matchmaking queue. You can leave the queue with the command c!stop.",inline=False)
+            await channel.send(f"<@{sender.id}>", embed=embedMessage)
+            return
+
+        adminOnly = ServerData.GetServerSetting(channel.guild.id, "queue_admin_only")
+        if adminOnly and not sender.permissions_in(channel).manage_messages:
+            embedMessage = defaultEmbed()
+            embedMessage.add_field(name="Unexpected landing! :tear:", value="You do not have the correct permissions to start a queue!.",inline=False)
             await channel.send(f"<@{sender.id}>", embed=embedMessage)
             return
 
@@ -299,8 +307,8 @@ class GameCoordinatorBot(discord.Client):
                     break
             else:
                 #Remove whitespace from the maps/gamemodes, and set our queue map/gamemode list.
-                messageContent = re.sub(r'\s+', '', messageContent)
-                theQueue.Maps = messageContent.split(',').copy()
+                messageContent = arguments[3:]
+                theQueue.Maps = messageContent.copy()
         else:
             theQueue.Maps = "*"
 
@@ -321,8 +329,8 @@ class GameCoordinatorBot(discord.Client):
             extraEmbedMessage.add_field(name="Region:", value=f"{regionEmoji}", inline=True)
             extraEmbedMessage.add_field(name="Maps/Gamemodes:", value=f"{theQueue.Maps}", inline=True)
             extraEmbedMessage.add_field(name="Player Target:", value=f"{arguments[0]}", inline=True) 
-            extraEmbedMessage.insert_field_at(69, name="Players Queueing", value=f"{sender.name}", inline=True) # we need to edit this later so im using le funny number as an index
             extraEmbedMessage.add_field(name="Join this queue!", value=f"You can join this queue using c!join {len(self.queuelist)}")
+            extraEmbedMessage.insert_field_at(4, name="Players Queueing", value=f"{sender.name}", inline=True) # we need to edit this later so im using 4 as an index
 
             toPingString = f"<@{sender.id}>"
             broadcastRole = ServerData.GetServerSetting(channel.guild.id, "queue_notify_role")
@@ -336,8 +344,8 @@ class GameCoordinatorBot(discord.Client):
             embedMessage.add_field(name="Region:", value=f"{regionEmoji}", inline=True)
             embedMessage.add_field(name="Maps/Gamemodes:", value=f"{theQueue.Maps}", inline=True)
             embedMessage.add_field(name="Player Target:", value=f"{arguments[0]}", inline=True) 
-            embedMessage.insert_field_at(69, name="Players Queueing", value=f"{sender.name}", inline=True) # we need to edit this later so im using le funny number as an index
             embedMessage.add_field(name="Join this queue!", value=f"You can join this queue using c!join {len(self.queuelist)}")
+            embedMessage.insert_field_at(4, name="Players Queueing", value=f"{sender.name}", inline=True) # we need to edit this later so im using 4 as an index
 
             await actualMessage.edit(embed=embedMessage)
             theQueue.MessageToUpdate = actualMessage

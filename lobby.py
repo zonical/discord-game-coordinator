@@ -20,7 +20,7 @@ class QueueLobby(Lobby):
         return len(self.Members)+1
     
     async def AddMember(self, member: discord.Client):
-        self.Members.insert(member)
+        self.Members.append(member)
         await updateMsg(self)
     
     async def RemoveMember(self, member:discord.Client):
@@ -34,8 +34,12 @@ class QueueLobby(Lobby):
         await self.MessageToUpdate.edit(embed=newEmbed)
 
 async def updateMsg(queue: QueueLobby):
-    # upadte the player
-    newEmbed = queue.MessageToUpdate.embeds[0]
-    newEmbed.set_field_at(index=69, name="Players Queueing", value=f"{queue.Owner}, {queue.Members}", inline=True) 
+    # update the msg
+    newEmbed = queue.MessageToUpdate.embeds.copy()[0]
+    memberString = ""
+    if 1 < queue.MemberCount:
+        for member in queue.Members:
+            memberString = f"{memberString}, {member}"
+    newEmbed.set_field_at(index=4, name="Players Queueing", value=f"{queue.Owner}{memberString}", inline=True)
 
     await queue.MessageToUpdate.edit(embed=newEmbed)

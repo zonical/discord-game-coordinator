@@ -82,21 +82,28 @@ class UserData:
 
     @staticmethod
     def ReadUsers():
-        with open(currentdir + "/data/UserData.json") as file: # thank you server_coordinator.py
-            allUserData = json.load(file)["users"] #Load our information as JSON.
-            for id in allUserData:
-                UserData(int(id), allUserData[id]) #why must json get rid of data types??? why???
+        if os.path.exists(currentdir + "/data/UserData.json"):
+            with open(currentdir + "/data/UserData.json") as file: # thank you server_coordinator.py
+                allUserData = json.load(file) #Load our information as JSON.
+                for id in allUserData:
+                    UserData(int(id), allUserData[id]) #why must json get rid of data types??? why???
+        else:
+            if not os.path.exists(currentdir + "/data"): #create the dir first
+                os.makedirs("data")
+            with open(currentdir + "/data/UserData.json", "w") as file: # the same as before but writable
+                json.dump({},file)
          
         return Users # incase we want to use it immediately
     
     @staticmethod
     def WriteUsers():
         with open(currentdir + "/data/UserData.json", "w") as file: # the same as before but writable
-            json.dump({"users":Users},file) # dict to make it into the correct format # not sure if this is the most effective way of doing this but fuck it
+            json.dump(Users,file) # dict to make it into the correct format # not sure if this is the most effective way of doing this but fuck it
 
 DefaultServerSettings = { # now this doesnt need to be changable since this exists pretty much for these two settings
     "queue_channel": False,
-    "queue_notify_role": False
+    "queue_notify_role": False,
+    "queue_admin_only": False
 }
 
 Servers = {} # same as the users dict, doesnt actually store instances
@@ -141,10 +148,16 @@ class ServerData:
 
     @staticmethod
     def Read():
-        with open(currentdir + "/data/ServerData.json", "r") as file: # thank you server_coordinator.py
-            allServerData = json.load(file) #Load our information as JSON.
-            for id in allServerData:
-                ServerData(int(id), allServerData[id]) #why must json get rid of data types??? why???
+        if os.path.exists(currentdir + "/data/ServerData.json"):
+            with open(currentdir + "/data/ServerData.json", "r") as file: # thank you server_coordinator.py
+                allServerData = json.load(file) #Load our information as JSON.
+                for id in allServerData:
+                    ServerData(int(id), allServerData[id]) #why must json get rid of data types??? why???
+        else:
+            if not os.path.exists(currentdir + "/data"): # create the dir first
+                os.makedirs("data")
+            with open(currentdir + "/data/ServerData.json", "w") as file: # the same as before but writable
+                json.dump({},file)
     
     @staticmethod
     def Write():
